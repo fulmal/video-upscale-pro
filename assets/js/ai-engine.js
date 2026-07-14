@@ -115,6 +115,21 @@ const AI_MODELS = {
             scale:  2,
             desc:   'Swin2SR — paling cepat & ringan, cocok untuk gambar HD',
         },
+        // ── High-Quality Community Models ──
+        {
+            id:     '4x-UltraSharp',
+            name:   '✨ 4xUltraSharp — Ultra Detail',
+            engine: 'realesrgan',
+            scale:  4,
+            desc:   'Kualitas tertinggi — super tajam, detail sangat halus. Terbaik untuk foto & portrait',
+        },
+        {
+            id:     '4x-Remacri',
+            name:   '💎 4xRemacri — Clarity Pro Style',
+            engine: 'realesrgan',
+            scale:  4,
+            desc:   'Detail halus & warna natural — mirip Clarity Pro, sangat direkomendasikan',
+        },
     ],
     gemini: [
         {

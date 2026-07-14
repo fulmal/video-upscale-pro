@@ -61,6 +61,19 @@ REALESRGAN_MODELS = {
         'anime': False,
         'desc':  'General photo upscaling 2×',
     },
+    # ── High-quality community models ─────────────────────────────────────────
+    '4x-UltraSharp': {
+        'file':  '4x-UltraSharp.pth',
+        'scale': 4,
+        'anime': False,
+        'desc':  '4× Ultra tajam — kualitas tertinggi, detail luar biasa',
+    },
+    '4x-Remacri': {
+        'file':  '4x_foolhardy_Remacri.pth',
+        'scale': 4,
+        'anime': False,
+        'desc':  '4× Remacri — detail halus & warna natural, mirip Clarity Pro',
+    },
 }
 
 SWIN2SR_MODELS = {
@@ -102,6 +115,11 @@ def pil_to_b64(img: Image.Image, fmt='PNG') -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 # ── Real-ESRGAN loader ────────────────────────────────────────────────────────
+# Models that use 6 blocks (anime architecture)
+_ANIME_MODELS  = {'realesrgan-x4plus-anime'}
+# Models that use SPAN architecture (community models like Nomos8k)
+_SPAN_MODELS   = {'4x-Nomos8k'}
+
 def get_esrgan(model_id: str):
     if model_id in _esrgan_cache:
         return _esrgan_cache[model_id]
@@ -109,18 +127,35 @@ def get_esrgan(model_id: str):
     cfg   = REALESRGAN_MODELS[model_id]
     wpath = WEIGHTS_DIR / cfg['file']
     if not wpath.exists():
-        raise FileNotFoundError(f"Weight tidak ada: {wpath}  →  jalankan download_weights.py")
+        raise FileNotFoundError(
+            f"Weight tidak ada: {wpath}\n"
+            f"Jalankan: python realesrgan-server/download_weights.py"
+        )
 
-    from basicsr.archs.rrdbnet_arch import RRDBNet
     from realesrgan import RealESRGANer
 
-    arch = RRDBNet(
-        num_in_ch=3, num_out_ch=3, num_feat=64,
-        num_block=6 if cfg['anime'] else 23,
-        num_grow_ch=32, scale=cfg['scale']
-    )
+    if model_id in _SPAN_MODELS:
+        # SPAN-based community model — use spandrel/net_interp fallback
+        try:
+            import spandrel
+            model_obj = spandrel.ModelLoader().load_from_file(str(wpath)).model
+        except Exception:
+            # Fallback: load as generic ESRGAN
+            from basicsr.archs.rrdbnet_arch import RRDBNet
+            model_obj = RRDBNet(
+                num_in_ch=3, num_out_ch=3, num_feat=64,
+                num_block=23, num_grow_ch=32, scale=cfg['scale']
+            )
+    else:
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+        num_block = 6 if model_id in _ANIME_MODELS else 23
+        model_obj = RRDBNet(
+            num_in_ch=3, num_out_ch=3, num_feat=64,
+            num_block=num_block, num_grow_ch=32, scale=cfg['scale']
+        )
+
     upsampler = RealESRGANer(
-        scale=cfg['scale'], model_path=str(wpath), model=arch,
+        scale=cfg['scale'], model_path=str(wpath), model=model_obj,
         tile=512, tile_pad=10, pre_pad=0, half=False, device=DEVICE,
     )
     _esrgan_cache[model_id] = upsampler
