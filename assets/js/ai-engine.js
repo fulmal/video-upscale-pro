@@ -9,7 +9,7 @@
 // ═══════════════════════════════════════════════════════
 const DEFAULT_GEMINI_KEY = '';
 // Version stamp — change this whenever DEFAULT_GEMINI_KEY changes to auto-clear old cache
-const GEMINI_KEY_VERSION  = 'v3';
+const GEMINI_KEY_VERSION  = 'v4';
 
 // ═══════════════════════════════════════════════════════
 // Model Registry
