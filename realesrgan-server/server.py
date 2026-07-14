@@ -13,11 +13,13 @@ import logging
 import traceback
 from pathlib import Path
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from PIL import Image
 import numpy as np
-import torch
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
@@ -35,7 +37,149 @@ def get_device():
 
 DEVICE = get_device()
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# ── Legacy ESRGAN Architecture (old community models: model.X key format) ────
+class _RDB5C(nn.Module):
+    """Residual Dense Block matching old ESRGAN conv1.0 / conv2.0 key format."""
+    def __init__(self, nf=64, gc=32):
+        super().__init__()
+        self.conv1 = nn.Sequential(nn.Conv2d(nf,      gc, 3,1,1), nn.LeakyReLU(0.2, True))
+        self.conv2 = nn.Sequential(nn.Conv2d(nf+gc,   gc, 3,1,1), nn.LeakyReLU(0.2, True))
+        self.conv3 = nn.Sequential(nn.Conv2d(nf+2*gc, gc, 3,1,1), nn.LeakyReLU(0.2, True))
+        self.conv4 = nn.Sequential(nn.Conv2d(nf+3*gc, gc, 3,1,1), nn.LeakyReLU(0.2, True))
+        self.conv5 = nn.Sequential(nn.Conv2d(nf+4*gc, nf, 3,1,1))
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x2 = self.conv2(torch.cat((x, x1), 1))
+        x3 = self.conv3(torch.cat((x, x1, x2), 1))
+        x4 = self.conv4(torch.cat((x, x1, x2, x3), 1))
+        x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
+        return x5 * 0.2 + x
+
+class _RRDB(nn.Module):
+    """RRDB block with RDB1/RDB2/RDB3 attributes (matches old key format)."""
+    def __init__(self, nf=64, gc=32):
+        super().__init__()
+        self.RDB1 = _RDB5C(nf, gc)
+        self.RDB2 = _RDB5C(nf, gc)
+        self.RDB3 = _RDB5C(nf, gc)
+    def forward(self, x):
+        out = self.RDB1(x); out = self.RDB2(out); out = self.RDB3(out)
+        return out * 0.2 + x
+
+class _Trunk(nn.Module):
+    """Trunk: N RRDB blocks + trunk conv, stored as self.sub (matches model.1.sub.X)."""
+    def __init__(self, nb=23, nf=64, gc=32):
+        super().__init__()
+        self.sub = nn.Sequential(*[_RRDB(nf, gc) for _ in range(nb)],
+                                   nn.Conv2d(nf, nf, 3, 1, 1))  # sub[nb] = trunk_conv
+    def forward(self, x):
+        blocks = list(self.sub.children())
+        feat = x
+        for b in blocks[:-1]: feat = b(feat)  # RRDB blocks
+        return x + blocks[-1](feat)             # residual + trunk conv
+
+class RRDBNet_Legacy(nn.Module):
+    """
+    Old-format ESRGAN RRDBNet for community models (4xUltraSharp, 4xRemacri, etc.).
+    Architecture: model.0 → model.1(sub) → model.3 → interp → model.6 → interp → model.8 → model.10
+    """
+    def __init__(self, in_nc=3, out_nc=3, nf=64, nb=23, gc=32, scale=4):
+        super().__init__()
+        self.scale = scale
+        self.model = nn.Sequential(
+            nn.Conv2d(in_nc, nf, 3, 1, 1),          # model.0
+            _Trunk(nb, nf, gc),                       # model.1
+            nn.Identity(),                            # model.2 placeholder (no params)
+            nn.Conv2d(nf, nf, 3, 1, 1),              # model.3  up-conv 1
+            nn.LeakyReLU(0.2, True),                  # model.4
+            nn.Identity(),                            # model.5 placeholder
+            nn.Conv2d(nf, nf, 3, 1, 1),              # model.6  up-conv 2
+            nn.LeakyReLU(0.2, True),                  # model.7
+            nn.Conv2d(nf, nf, 3, 1, 1),              # model.8  HRconv
+            nn.LeakyReLU(0.2, True),                  # model.9
+            nn.Conv2d(nf, out_nc, 3, 1, 1),          # model.10 conv_last
+        )
+
+    def forward(self, x):
+        # Run layers manually so we can insert 2× interpolations
+        mods = list(self.model.children())
+        feat = mods[0](x)          # model.0 conv_first
+        feat = mods[1](feat)       # model.1 RRDB trunk
+        # model.2 placeholder (skip)
+        feat = F.interpolate(feat, scale_factor=2, mode='nearest')
+        feat = mods[3](feat)       # model.3 up-conv 1
+        feat = mods[4](feat)       # lrelu
+        # model.5 placeholder (skip)
+        feat = F.interpolate(feat, scale_factor=2, mode='nearest')
+        feat = mods[6](feat)       # model.6 up-conv 2
+        feat = mods[7](feat)       # lrelu
+        feat = mods[8](feat)       # model.8 HRconv
+        feat = mods[9](feat)       # lrelu
+        feat = mods[10](feat)      # model.10 conv_last
+        return feat
+
+_legacy_esrgan_cache = {}
+
+def run_legacy_esrgan(pil_in: Image.Image, model_id: str) -> Image.Image:
+    """Tiled inference for old-format ESRGAN community models."""
+    global _legacy_esrgan_cache
+
+    if model_id not in _legacy_esrgan_cache:
+        cfg   = REALESRGAN_MODELS[model_id]
+        wpath = WEIGHTS_DIR / cfg['file']
+        if not wpath.exists():
+            raise FileNotFoundError(f"Weight tidak ada: {wpath}\nJalankan: python realesrgan-server/download_weights.py community")
+
+        # Detect num_blocks from checkpoint
+        sd = torch.load(str(wpath), map_location='cpu', weights_only=True)
+        nb = sum(1 for k in sd if k.startswith('model.1.sub.') and k.endswith('.RDB1.conv1.0.weight'))
+        nb = nb if nb > 0 else 23
+        log.info(f"Legacy ESRGAN: {model_id}, nb={nb}, scale={cfg['scale']}")
+
+        net = RRDBNet_Legacy(nb=nb, scale=cfg['scale'])
+        net.load_state_dict(sd, strict=False)  # strict=False ignores Identity placeholders
+        net.eval()
+        if DEVICE.type in ('cuda', 'mps'):
+            net = net.to(DEVICE)
+        _legacy_esrgan_cache[model_id] = net
+        log.info(f"✅ Legacy ESRGAN loaded: {model_id} (device={DEVICE})")
+
+    net   = _legacy_esrgan_cache[model_id]
+    scale = REALESRGAN_MODELS[model_id]['scale']
+    tile  = 256   # safe tile size for M1 Pro
+    pad   = 16
+
+    img_t = torch.from_numpy(np.array(pil_in).astype(np.float32) / 255.0)
+    img_t = img_t.permute(2, 0, 1).unsqueeze(0)   # 1×3×H×W
+    if DEVICE.type in ('cuda', 'mps'):
+        img_t = img_t.to(DEVICE)
+
+    _, _, h, w = img_t.shape
+    out_h, out_w = h * scale, w * scale
+    out_t = torch.zeros(1, 3, out_h, out_w, device=img_t.device)
+
+    with torch.no_grad():
+        for y in range(0, h, tile):
+            for x in range(0, w, tile):
+                x1 = max(0, x - pad);  y1 = max(0, y - pad)
+                x2 = min(w, x + tile + pad); y2 = min(h, y + tile + pad)
+                patch = img_t[:, :, y1:y2, x1:x2]
+                patch_out = net(patch)
+
+                # Destination slice in output (no padding)
+                px1 = (x - x1) * scale; py1 = (y - y1) * scale
+                px2 = px1 + min(tile, w - x) * scale
+                py2 = py1 + min(tile, h - y) * scale
+                ox1 = x * scale; oy1 = y * scale
+                ox2 = ox1 + (px2 - px1); oy2 = oy1 + (py2 - py1)
+                out_t[:, :, oy1:oy2, ox1:ox2] = patch_out[:, :, py1:py2, px1:px2]
+
+    out_np = out_t.squeeze(0).permute(1, 2, 0).clamp(0, 1).cpu().numpy()
+    out_np = (out_np * 255).round().astype(np.uint8)
+    return Image.fromarray(out_np)
+
+# ── Model Registries ──────────────────────────────────────────────────────────
+
 BASE_DIR     = Path(__file__).parent
 WEIGHTS_DIR  = BASE_DIR / 'weights'
 SWIN2SR_DIR  = BASE_DIR / 'swin2sr-models'
@@ -61,18 +205,20 @@ REALESRGAN_MODELS = {
         'anime': False,
         'desc':  'General photo upscaling 2×',
     },
-    # ── High-quality community models ─────────────────────────────────────────
+    # ── High-quality community models (legacy ESRGAN format) ──────────────────
     '4x-UltraSharp': {
-        'file':  '4x-UltraSharp.pth',
-        'scale': 4,
-        'anime': False,
-        'desc':  '4× Ultra tajam — kualitas tertinggi, detail luar biasa',
+        'file':   '4x-UltraSharp.pth',
+        'scale':  4,
+        'anime':  False,
+        'legacy': True,   # old ESRGAN format — use RRDBNet_Legacy loader
+        'desc':   '4× Ultra tajam — kualitas tertinggi, detail luar biasa',
     },
     '4x-Remacri': {
-        'file':  '4x_foolhardy_Remacri.pth',
-        'scale': 4,
-        'anime': False,
-        'desc':  '4× Remacri — detail halus & warna natural, mirip Clarity Pro',
+        'file':   '4x_foolhardy_Remacri.pth',
+        'scale':  4,
+        'anime':  False,
+        'legacy': True,
+        'desc':   '4× Remacri — detail halus & warna natural, mirip Clarity Pro',
     },
 }
 
@@ -301,10 +447,17 @@ def upscale():
         if engine == 'realesrgan':
             if model_id not in REALESRGAN_MODELS:
                 return jsonify({'error': f'Model tidak dikenal: {model_id}'}), 400
-            upsampler = get_esrgan(model_id)
-            bgr_in    = np.array(pil_in)[:, :, ::-1]   # RGB→BGR
-            bgr_out, _ = upsampler.enhance(bgr_in, outscale=REALESRGAN_MODELS[model_id]['scale'])
-            pil_out   = Image.fromarray(bgr_out[:, :, ::-1].astype(np.uint8))
+
+            cfg = REALESRGAN_MODELS[model_id]
+            if cfg.get('legacy'):
+                # Old-format ESRGAN community model (model.X key format)
+                pil_out = run_legacy_esrgan(pil_in, model_id)
+            else:
+                upsampler = get_esrgan(model_id)
+                bgr_in    = np.array(pil_in)[:, :, ::-1]   # RGB→BGR
+                bgr_out, _ = upsampler.enhance(bgr_in, outscale=cfg['scale'])
+                pil_out   = Image.fromarray(bgr_out[:, :, ::-1].astype(np.uint8))
+
 
         elif engine == 'swin2sr':
             if model_id not in SWIN2SR_MODELS:
