@@ -483,25 +483,65 @@ Return ONLY valid JSON, no explanation:
     outputCanvas.width  = targetW;
     outputCanvas.height = targetH;
 
-    if(aiParams && typeof initImgGL === 'function' && typeof renderImgGL === 'function') {
+    // Resolve source — webglCanvas may be a base64 string (from processImg)
+    let sourceEl = webglCanvas;
+    if (typeof webglCanvas === 'string') {
+        // Decode base64 → HTMLImageElement so WebGL can use it as a texture
+        try {
+            sourceEl = await new Promise((res, rej) => {
+                const img = new Image();
+                img.onload  = () => res(img);
+                img.onerror = rej;
+                img.src = webglCanvas.startsWith('data:') ? webglCanvas : 'data:image/jpeg;base64,' + webglCanvas;
+            });
+        } catch(e) {
+            console.warn('[Gemini] Gagal decode base64 source:', e);
+            sourceEl = null;
+        }
+    }
+
+    // Detect active engine (fractal or bicubic) from image-app global
+    const isFractal = (typeof imgEngine !== 'undefined' && imgEngine === 'fractal');
+    const hasGLFractal = isFractal && typeof initImgGLFractal === 'function' && typeof renderImgGLFractal === 'function';
+    const hasGLBicubic = typeof initImgGL === 'function' && typeof renderImgGL === 'function';
+
+    if(aiParams && sourceEl && (hasGLFractal || hasGLBicubic)) {
         try {
             const glCanvas = document.createElement('canvas');
             glCanvas.width  = targetW;
             glCanvas.height = targetH;
-            const glRef = initImgGL(glCanvas);
-            if(glRef) {
-                renderImgGL(glRef, webglCanvas, webglCanvas.width, webglCanvas.height, aiParams);
-                glRef.gl.finish();
-                outputCanvas.getContext('2d').drawImage(glCanvas, 0, 0, targetW, targetH);
+
+            const srcW = sourceEl.naturalWidth  || sourceEl.videoWidth  || sourceEl.width  || targetW;
+            const srcH = sourceEl.naturalHeight || sourceEl.videoHeight || sourceEl.height || targetH;
+
+            if(hasGLFractal) {
+                // Use Fractal IFS engine (matches the active imgEngine)
+                const glRef = initImgGLFractal(glCanvas);
+                if(glRef) {
+                    renderImgGLFractal(glRef, sourceEl, srcW, srcH, aiParams);
+                    glRef.gl.finish();
+                    outputCanvas.getContext('2d').drawImage(glCanvas, 0, 0, targetW, targetH);
+                } else {
+                    outputCanvas.getContext('2d').drawImage(sourceEl, 0, 0, targetW, targetH);
+                }
             } else {
-                outputCanvas.getContext('2d').drawImage(webglCanvas, 0, 0, targetW, targetH);
+                // Use standard bicubic WebGL engine
+                const glRef = initImgGL(glCanvas);
+                if(glRef) {
+                    renderImgGL(glRef, sourceEl, srcW, srcH, aiParams);
+                    glRef.gl.finish();
+                    outputCanvas.getContext('2d').drawImage(glCanvas, 0, 0, targetW, targetH);
+                } else {
+                    outputCanvas.getContext('2d').drawImage(sourceEl, 0, 0, targetW, targetH);
+                }
             }
         } catch(e) {
             console.warn('[Gemini] WebGL render gagal, fallback 2D scale:', e);
-            outputCanvas.getContext('2d').drawImage(webglCanvas, 0, 0, targetW, targetH);
+            if(sourceEl) outputCanvas.getContext('2d').drawImage(sourceEl, 0, 0, targetW, targetH);
         }
     } else {
-        outputCanvas.getContext('2d').drawImage(webglCanvas, 0, 0, targetW, targetH);
+        // No WebGL available or no source — just scale up with 2D
+        if(sourceEl) outputCanvas.getContext('2d').drawImage(sourceEl, 0, 0, targetW, targetH);
     }
 
     onProgress('Auto Settings selesai ✓', 96);
