@@ -1,0 +1,23 @@
+# Node.js
+node_modules/
+npm-debug.log*
+.npm
+
+# Python
+realesrgan-server/.venv/
+realesrgan-server/__pycache__/
+realesrgan-server/*.pyc
+realesrgan-server/server.log
+realesrgan-server/server-error.log
+
+# Weights (besar, unduh ulang jika dibutuhkan — jalankan download_weights.py)
+realesrgan-server/weights/
+realesrgan-server/swin2sr-models/
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# Editor
+.vscode/
+.idea/

@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ScalerPro — Upscale Video & Gambar hingga 4K-8K menggunakan GPU WebGL shader. Multi-Pass Bicubic Enhancement, Bilateral Denoise, Unsharp Mask, Clarity, Vibrance — langsung di browser.">
+    <title>ScalerPro — GPU Video & Image Upscaler</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/image.css">
+    <link rel="stylesheet" href="assets/css/ai.css">
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     App Shell
+     ════════════════════════════════════════ -->
+<div class="app">
+
+    <!-- ── Header ── -->
+    <div class="header">
+        <div class="badge"><span class="dot"></span>WebGL GPU-Accelerated</div>
+        <h1><span class="gr">Scaler</span>Pro</h1>
+        <p>Upscale Video & Gambar hingga 4K–8K dengan GPU shader — Bicubic Multi-Pass, Denoise, Clarity & Vibrance Enhancement.</p>
+    </div>
+
+    <!-- ── Tab Navigation ── -->
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="video" onclick="switchTab('video')">
+            <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            Video Upscale
+        </button>
+        <button class="tab-btn img-tab" data-tab="image" onclick="switchTab('image')">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Image Upscale
+            <span class="tab-badge">EXTREME</span>
+        </button>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         VIDEO UPSCALE PANEL
+         ════════════════════════════════════════ -->
+    <div id="video-panel">
+        <div class="mc">
+
+            <!-- Step Indicator -->
+            <div class="steps">
+                <div class="si active" data-step="1"><div class="sn">1</div><span class="sl">Upload</span></div>
+                <div class="sc"></div>
+                <div class="si" data-step="2"><div class="sn">2</div><span class="sl">Pengaturan</span></div>
+                <div class="sc"></div>
+                <div class="si" data-step="3"><div class="sn">3</div><span class="sl">Proses</span></div>
+                <div class="sc"></div>
+                <div class="si" data-step="4"><div class="sn">4</div><span class="sl">Selesai</span></div>
+            </div>
+
+            <!-- Step Content -->
+            <div class="ca">
+
+                <!-- ─── STEP 1: Upload ─── -->
+                <div class="sp active" id="step1">
+                    <div class="uz" id="uz">
+                        <div class="ui">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <h3>Drop video di sini</h3>
+                        <p>atau klik untuk memilih file</p>
+                        <button class="bb" onclick="document.getElementById('fi').click()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                                <polyline points="13 2 13 9 20 9"/>
+                            </svg>
+                            Pilih File
+                        </button>
+                        <div class="ft">
+                            <span>MP4</span><span>WebM</span><span>MOV</span><span>AVI</span>
+                        </div>
+                    </div>
+                    <input type="file" id="fi" accept="video/*">
+                </div>
+
+                <!-- ─── STEP 2: Pengaturan ─── -->
+                <div class="sp" id="step2">
+
+                    <!-- Video Preview -->
+                    <div class="vw"><video id="pv" controls></video></div>
+                    <div class="fa">
+                        <div class="fn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                <polygon points="23 7 16 12 23 17 23 7"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                            <span id="fn2">video.mp4</span>
+                        </div>
+                        <button class="rb" onclick="rmVid()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                            Ganti
+                        </button>
+                    </div>
+
+                    <!-- File Info -->
+                    <div class="sib">
+                        <div class="sii">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+                            <span class="lb">Resolusi:</span>
+                            <span class="vl" id="sRes">—</span>
+                        </div>
+                        <div class="id"></div>
+                        <div class="sii">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span class="lb">Durasi:</span>
+                            <span class="vl" id="sDur">—</span>
+                        </div>
+                        <div class="id"></div>
+                        <div class="sii">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg>
+                            <span class="lb">Ukuran:</span>
+                            <span class="vl" id="sSiz">—</span>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Preview -->
+                    <div class="sc2 fw" style="margin-top:24px">
+                        <div class="slabel">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                <line x1="12" y1="3" x2="12" y2="17"/>
+                            </svg>
+                            Preview Perbandingan (Real-time)
+                        </div>
+                        <div class="cmp-wrap">
+                            <canvas id="cmpC"></canvas>
+                            <div class="cmp-labels"><span>◀ Sebelum</span><span>Sesudah ▶</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Grid -->
+                    <div class="sg">
+
+                        <!-- Resolution Picker -->
+                        <div class="sc2">
+                            <div class="slabel">
+                                <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                    <line x1="8" y1="21" x2="16" y2="21"/>
+                                    <line x1="12" y1="17" x2="12" y2="21"/>
+                                </svg>
+                                Target Resolusi
+                            </div>
+                            <div class="ro" id="resOpts"></div>
+                        </div>
+
+                        <!-- Enhancement Sliders -->
+                        <div class="sc2">
+                            <div class="slabel">
+                                <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/>
+                                </svg>
+                                Pengaturan Enhancement
+                            </div>
+
+                            <div class="slc">
+                                <div class="slh">
+                                    <span style="font-size:13px;color:var(--t2)">Unsharp Mask</span>
+                                    <span class="sv" id="shV">120%</span>
+                                </div>
+                                <input type="range" id="shS" min="0" max="200" value="120" oninput="upC()">
+                                <div class="sll"><span>Halus</span><span>Tajam</span></div>
+                            </div>
+
+                            <div class="slc" style="margin-top:16px">
+                                <div class="slh">
+                                    <span style="font-size:13px;color:var(--t2)">Clarity (Lokal Kontras)</span>
+                                    <span class="sv" id="clV">60%</span>
+                                </div>
+                                <input type="range" id="clS" min="0" max="150" value="60" oninput="upC()">
+                                <div class="sll"><span>Flat</span><span>Detail</span></div>
+                            </div>
+
+                            <div class="slc" style="margin-top:16px">
+                                <div class="slh">
+                                    <span style="font-size:13px;color:var(--t2)">Vibrance (Warna)</span>
+                                    <span class="sv" id="viV">35%</span>
+                                </div>
+                                <input type="range" id="viS" min="0" max="100" value="35" oninput="upC()">
+                                <div class="sll"><span>Alami</span><span>Vivid</span></div>
+                            </div>
+
+                            <div class="slc" style="margin-top:16px">
+                                <div class="slh">
+                                    <span style="font-size:13px;color:var(--t2)">
+                                        Kepadatan Pixel
+                                        <span style="font-size:10px;font-family:'JetBrains Mono';color:var(--accent2);background:rgba(59,108,245,.12);padding:2px 6px;border-radius:4px;margin-left:4px">Bicubic+Synth</span>
+                                    </span>
+                                    <span class="sv" id="dnV">100%</span>
+                                </div>
+                                <input type="range" id="dnS" min="0" max="200" value="100" oninput="upC()">
+                                <div class="sll"><span>Bilinear</span><span>Bicubic+Synth ✦</span></div>
+                            </div>
+
+                            <div class="slc" style="margin-top:16px">
+                                <div class="slh">
+                                    <span style="font-size:13px;color:var(--t2)">Kualitas Output</span>
+                                    <span class="sv" id="qV">90%</span>
+                                </div>
+                                <input type="range" id="qS" min="30" max="100" value="90" step="5"
+                                       oninput="document.getElementById('qV').textContent=this.value+'%'">
+                                <div class="sll"><span>Ringan</span><span>Lossless</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Format Output -->
+                        <div class="sc2 fw">
+                            <div class="slabel">
+                                <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                </svg>
+                                Format Output
+                            </div>
+                            <div class="fo">
+                                <div class="fo2 sel" data-fmt="webm" onclick="selF(this)">
+                                    <div class="fn2">WebM</div>
+                                    <div class="fd">VP9 — Kualitas terbaik</div>
+                                </div>
+                                <div class="fo2" data-fmt="mp4" onclick="selF(this)">
+                                    <div class="fn2">MP4</div>
+                                    <div class="fd">H.264 — Kompatibel luas</div>
+                                </div>
+                            </div>
+                            <div id="cn" style="margin-top:10px;font-size:12px;color:var(--t3);padding:8px 12px;background:var(--card);border-radius:6px;border:1px solid var(--border);display:none"></div>
+                        </div>
+                    </div>
+
+                    <!-- Gemini AI Video Analysis -->
+                    <div class="ai-section" id="vid-ai-section" style="margin:16px 0">
+                        <div class="ai-header" onclick="toggleVidAI()">
+                            <div class="ai-icon" style="background:linear-gradient(135deg,#1a73e8,#34a853)">✨</div>
+                            <div class="ai-title-wrap">
+                                <div class="ai-title" style="color:#93c5fd">
+                                    Gemini AI Optimization
+                                    <span style="font-size:10px;padding:2px 7px;background:linear-gradient(90deg,rgba(26,115,232,.3),rgba(52,168,83,.2));border:1px solid rgba(26,115,232,.4);border-radius:10px;color:#93c5fd;font-weight:700;letter-spacing:.05em">GOOGLE</span>
+                                </div>
+                                <div class="ai-sub">Gemini analisa konten video &amp; auto-set parameter optimal</div>
+                            </div>
+                            <label class="ai-toggle" onclick="event.stopPropagation()">
+                                <input type="checkbox" id="vid-ai-chk" onchange="onVidAIToggle(this.checked)" style="display:none">
+                                <span class="ai-toggle-track" style="cursor:pointer"></span>
+                            </label>
+                        </div>
+                        <div class="ai-body" id="vid-ai-body">
+                            <div class="ai-body-inner">
+                                <div class="ai-field">
+                                    <label>GOOGLE AI STUDIO API KEY</label>
+                                    <div class="ai-key-wrap">
+                                        <input type="password" id="vid-gem-key" placeholder="AIzaSy..."
+                                               oninput="saveKey('gemini', this.value); document.getElementById('ai-gem-key') && (document.getElementById('ai-gem-key').value=this.value)">
+                                        <button class="ai-key-btn" onclick="toggleKeyVisibility('vid-gem-key', this)" title="Show/hide">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                <circle cx="12" cy="12" r="3"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button class="btn" id="vid-ai-btn"
+                                        onclick="geminiAnalyzeVideo()"
+                                        style="width:100%;background:linear-gradient(90deg,#1a73e8,#34a853);border:none;margin-top:4px;font-size:13px">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+                                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                    </svg>
+                                    Analisa dengan Gemini AI
+                                </button>
+                                <!-- Result card (hidden until analyzed) -->
+                                <div id="vid-ai-result" style="display:none;margin-top:14px;padding:12px 14px;background:rgba(26,115,232,0.08);border:1px solid rgba(26,115,232,0.25);border-radius:10px">
+                                    <div style="font-size:12px;font-weight:700;color:#93c5fd;margin-bottom:8px">✨ Rekomendasi Gemini</div>
+                                    <div id="vid-ai-scene" style="font-size:12px;color:#6b7280;margin-bottom:8px"></div>
+                                    <div id="vid-ai-reason" style="font-size:11.5px;color:#6b7280;font-style:italic;margin-bottom:10px"></div>
+                                    <button onclick="applyGeminiParams()" class="btn"
+                                            style="width:100%;background:linear-gradient(90deg,rgba(26,115,232,.2),rgba(52,168,83,.15));border:1px solid rgba(26,115,232,.4);font-size:12px">
+                                        ✓ Terapkan ke Slider
+                                    </button>
+                                </div>
+                                <div class="ai-info" style="margin-top:10px">
+                                    Gemini akan menganalisa satu frame dari video dan merekomendasikan
+                                    setting <strong>Sharpen, Clarity, Vibrance, Pixel Density</strong> yang optimal sesuai konten.
+                                    Key yang sama digunakan untuk Image Upscale AI.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="br">
+                        <button class="btn bg2" onclick="goS(1)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="19" y1="12" x2="5" y2="12"/>
+                                <polyline points="12 19 5 12 12 5"/>
+                            </svg>
+                            Kembali
+                        </button>
+                        <button class="btn bp" id="startBtn" onclick="startProc()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Mulai Upscale
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ─── STEP 3: Proses ─── -->
+                <div class="sp" id="step3">
+                    <div class="pv">
+                        <div class="pa">
+                            <div class="pr"></div>
+                            <div class="pra"></div>
+                            <div class="pc">
+                                <div class="pp" id="pP">0%</div>
+                                <div class="ppl">Selesai</div>
+                            </div>
+                        </div>
+                        <div class="pbc">
+                            <div class="pbb"><div class="pbf" id="pF" style="width:0%"></div></div>
+                        </div>
+                        <div class="pin">
+                            <div class="pid">Frame: <strong id="fI">0</strong></div>
+                            <div class="pid">Waktu: <strong id="tI">0:00</strong></div>
+                            <div class="pid">Sisa:  <strong id="eI">—</strong></div>
+                        </div>
+                        <p class="pst" id="pS"><strong>Menyiapkan...</strong></p>
+                    </div>
+
+                    <!-- Live Log Panel -->
+                    <div class="log-head">
+                        <div class="log-head-dot" id="vid-log-dot"></div>
+                        Log Proses
+                    </div>
+                    <div class="proc-log" id="vid-log">
+                        <div class="log-row log-gpu"><span class="log-ts">--:--:--</span><span class="log-msg">Menunggu proses dimulai...</span></div>
+                    </div>
+                    <div class="br" style="justify-content:center">
+                        <button class="btn bg2" onclick="cancelProc()" style="color:var(--red);border-color:rgba(239,68,68,.3)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            </svg>
+                            Batalkan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ─── STEP 4: Selesai ─── -->
+                <div class="sp" id="step4">
+                    <div class="cv">
+                        <div class="ci">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <div class="ct">Upscale Selesai!</div>
+                        <div class="cs">Video berhasil ditingkatkan dengan GPU shader enhancement</div>
+
+                        <div class="ub">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                                <polyline points="17 6 23 6 23 12"/>
+                            </svg>
+                            <span id="upT">—</span>
+                        </div>
+
+                        <div class="rs">
+                            <div class="rst"><div class="rv ac" id="sF">—</div><div class="rl">Sebelum</div></div>
+                            <div class="rst">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2">
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                    <polyline points="12 5 19 12 12 19"/>
+                                </svg>
+                            </div>
+                            <div class="rst"><div class="rv gn" id="sT">—</div><div class="rl">Sesudah</div></div>
+                            <div class="rst"><div class="rv" id="sSz">—</div><div class="rl">Ukuran</div></div>
+                            <div class="rst"><div class="rv" id="sTi">—</div><div class="rl">Waktu</div></div>
+                        </div>
+
+                        <div class="eb">
+                            <button class="btn bs" onclick="dlResult()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Download Video
+                            </button>
+                            <button class="btn bg2" onclick="resetAll()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="1 4 1 10 7 10"/>
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                </svg>
+                                Proses Lain
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- .ca -->
+        </div><!-- .mc -->
+    </div><!-- #video-panel -->
+
+
+    <!-- ════════════════════════════════════════
+         IMAGE UPSCALE EXTREME PANEL
+         ════════════════════════════════════════ -->
+    <div id="img-panel" style="display:none">
+        <div class="mc">
+
+            <!-- ─── Upload ─── -->
+            <div id="img-upload" class="ca">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+                    <div class="badge img-badge">
+                        <span class="dot img-dot"></span>Multi-Pass GPU Enhancement
+                    </div>
+                    <div class="extreme-label">EXTREME</div>
+                </div>
+
+                <div class="uz" id="img-uz">
+                    <div class="ui">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                    </div>
+                    <h3>Drop gambar di sini</h3>
+                    <p>atau klik untuk memilih file gambar</p>
+                    <button class="bb" onclick="document.getElementById('img-fi').click()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                            <polyline points="13 2 13 9 20 9"/>
+                        </svg>
+                        Pilih Gambar
+                    </button>
+                    <div class="ft">
+                        <span>PNG</span><span>JPG</span><span>WebP</span><span>AVIF</span>
+                    </div>
+                </div>
+                <input type="file" id="img-fi" accept="image/*">
+            </div>
+
+            <!-- ─── Editor ─── -->
+            <div id="img-editor" style="display:none" class="ca">
+
+                <!-- File Info Bar -->
+                <div class="fa">
+                    <div class="fn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        <span id="img-fn2">image.png</span>
+                    </div>
+                    <button class="rb" onclick="resetImg()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        Ganti
+                    </button>
+                </div>
+
+                <div class="sib">
+                    <div class="sii">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+                        <span class="lb">Resolusi:</span>
+                        <span class="vl" id="img-sRes">—</span>
+                    </div>
+                    <div class="id"></div>
+                    <div class="sii">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg>
+                        <span class="lb">Ukuran:</span>
+                        <span class="vl" id="img-sSiz">—</span>
+                    </div>
+                </div>
+
+                <!-- Comparison Canvas (drag divider to compare before/after) -->
+                <div class="img-cmp-wrap" id="img-cmp-wrap">
+                    <canvas id="img-before-c" class="img-before-c"></canvas>
+                    <canvas id="img-after-c"  class="img-after-c"></canvas>
+                    <div class="img-divider" id="img-divider">
+                        <div class="img-divider-handle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6"/>
+                                <polyline points="9 18 3 12 9 6" style="transform:translateX(12px)"/>
+                                <line x1="8" y1="12" x2="16" y2="12"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="img-cmp-labels">
+                        <span class="img-lbl-before">◀ Original</span>
+                        <span class="img-lbl-after">Enhanced ▶</span>
+                    </div>
+                </div>
+
+                <!-- Settings Grid -->
+                <div class="sg" style="margin-top:24px">
+
+                    <!-- Scale Selection -->
+                    <div class="sc2">
+                        <div class="slabel">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                            </svg>
+                            Target Scale
+                        </div>
+                        <div class="scale-opts" id="img-scale-opts"></div>
+                        <div class="scale-info">
+                            Output: <strong id="img-out-res">—</strong>
+                            &nbsp;·&nbsp;
+                            <strong id="img-passes">—</strong>
+                        </div>
+                    </div>
+
+                    <!-- Enhancement Sliders -->
+                    <div class="sc2">
+                        <div class="slabel">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/>
+                            </svg>
+                            Extreme Enhancement
+                        </div>
+
+                        <!-- Denoise -->
+                        <div class="slc">
+                            <div class="slh">
+                                <span style="font-size:13px;color:var(--t2)">Denoise (Bilateral)</span>
+                                <span class="sv" id="img-noV">20%</span>
+                            </div>
+                            <input type="range" id="img-noS" min="0" max="100" value="20" oninput="imgUpC()">
+                            <div class="sll"><span>Tanpa</span><span>Kuat</span></div>
+                        </div>
+
+                        <!-- Unsharp Mask -->
+                        <div class="slc" style="margin-top:16px">
+                            <div class="slh">
+                                <span style="font-size:13px;color:var(--t2)">Unsharp Mask</span>
+                                <span class="sv" id="img-shV">150%</span>
+                            </div>
+                            <input type="range" id="img-shS" min="0" max="300" value="150" oninput="imgUpC()">
+                            <div class="sll"><span>Halus</span><span>Tajam</span></div>
+                        </div>
+
+                        <!-- Clarity -->
+                        <div class="slc" style="margin-top:16px">
+                            <div class="slh">
+                                <span style="font-size:13px;color:var(--t2)">Clarity (Detail)</span>
+                                <span class="sv" id="img-clV">80%</span>
+                            </div>
+                            <input type="range" id="img-clS" min="0" max="200" value="80" oninput="imgUpC()">
+                            <div class="sll"><span>Flat</span><span>Detail</span></div>
+                        </div>
+
+                        <!-- Vibrance -->
+                        <div class="slc" style="margin-top:16px">
+                            <div class="slh">
+                                <span style="font-size:13px;color:var(--t2)">Vibrance (Warna)</span>
+                                <span class="sv" id="img-viV">40%</span>
+                            </div>
+                            <input type="range" id="img-viS" min="0" max="100" value="40" oninput="imgUpC()">
+                            <div class="sll"><span>Alami</span><span>Vivid</span></div>
+                        </div>
+
+                        <!-- Pixel Density (Bicubic + HF Synthesis) -->
+                        <div class="slc" style="margin-top:16px">
+                            <div class="slh">
+                                <span style="font-size:13px;color:var(--t2)">
+                                    Kepadatan Pixel
+                                    <span class="density-badge">Bicubic+Synth</span>
+                                </span>
+                                <span class="sv" id="img-dnV">100%</span>
+                            </div>
+                            <input type="range" id="img-dnS" min="0" max="200" value="100" oninput="imgUpC()">
+                            <div class="sll"><span>Bilinear</span><span>Bicubic+Synth ✦</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Format & Extreme Info -->
+                    <div class="sc2 fw">
+                        <div class="slabel">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            </svg>
+                            Format Output
+                        </div>
+                        <div class="fo">
+                            <div class="fo2 sel" data-imgfmt="png" onclick="selImgF(this)">
+                                <div class="fn2">PNG</div>
+                                <div class="fd">Lossless — Kualitas penuh</div>
+                            </div>
+                            <div class="fo2" data-imgfmt="webp" onclick="selImgF(this)">
+                                <div class="fn2">WebP</div>
+                                <div class="fd">95% Quality — File lebih kecil</div>
+                            </div>
+                        </div>
+                        <div class="extreme-info">
+                            <div class="ei-icon">⚡</div>
+                            <div>
+                                <strong>Multi-Pass GPU Enhancement</strong>
+                                <div class="ei-desc">Setiap pass upscale 2× dengan Bicubic Catmull-Rom + HF Synthesis. Enhancement kumulatif: Denoise → Sharpen → Clarity → Synthesis.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- .sg -->
+
+                <!-- ════════ ENGINE SELECTOR ════════ -->
+                <div class="engine-selector-wrap">
+                    <div class="engine-selector-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;opacity:.7">
+                            <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/>
+                        </svg>
+                        Upscale Engine
+                    </div>
+                    <div class="engine-btns">
+                        <button class="eng-btn sel" id="eng-btn-bicubic" onclick="setImgEngine('bicubic')">
+                            <div class="eng-icon">⚡</div>
+                            <div class="eng-info">
+                                <div class="eng-name">Bicubic GPU</div>
+                                <div class="eng-desc">Catmull-Rom + HF Synth</div>
+                            </div>
+                        </button>
+                        <button class="eng-btn" id="eng-btn-fractal" onclick="setImgEngine('fractal')">
+                            <div class="eng-icon eng-fractal-icon">✦</div>
+                            <div class="eng-info">
+                                <div class="eng-name">Genuine Fractal</div>
+                                <div class="eng-desc">IFS Self-Similarity</div>
+                            </div>
+                            <div class="eng-badge">NEW</div>
+                        </button>
+                    </div>
+                    <div class="engine-info-bar" id="engine-info">
+                        ⚡ <strong>Bicubic Catmull-Rom</strong> — multi-pass GPU, HF synthesis. Terbaik untuk upscale cepat dan portrait.
+                    </div>
+                </div>
+                <!-- ════════ END ENGINE SELECTOR ════════ -->
+
+                <!-- ════════ AI GENERATE SECTION ════════ -->
+                <div class="ai-section" id="ai-section">
+
+                    <!-- Header / Toggle -->
+                    <div class="ai-header" onclick="toggleAI()">
+                        <div class="ai-icon">✦</div>
+                        <div class="ai-title-wrap">
+                            <div class="ai-title">
+                                AI Generate Enhancement
+                                <span style="font-size:10px;padding:2px 7px;background:linear-gradient(90deg,rgba(124,58,237,.3),rgba(168,85,247,.2));border:1px solid rgba(168,85,247,.4);border-radius:10px;color:#c4b5fd;font-weight:700;letter-spacing:.05em">NEW</span>
+                            </div>
+                            <div class="ai-sub">Generatif AI — synthesize detail piksel baru via neural network</div>
+                        </div>
+                        <label class="ai-toggle" onclick="event.stopPropagation()">
+                            <input type="checkbox" id="ai-toggle-chk" onchange="onAIToggle(this.checked)">
+                            <span class="ai-toggle-track"></span>
+                        </label>
+                    </div>
+
+                    <!-- Body (collapsed until toggled ON) -->
+                    <div class="ai-body" id="ai-body">
+                        <div class="ai-body-inner">
+
+                            <!-- Provider Tabs -->
+                            <div class="ai-provider-tabs">
+                                <button class="ai-prov-btn sel" id="ai-prov-hf" onclick="switchAIProvider('huggingface')">
+                                    🤗 HuggingFace
+                                    <span class="badge-free">GRATIS</span>
+                                </button>
+                                <button class="ai-prov-btn" id="ai-prov-rep" onclick="switchAIProvider('replicate')">
+                                    ⚡ Replicate
+                                </button>
+                                <button class="ai-prov-btn" id="ai-prov-gem" onclick="switchAIProvider('gemini')">
+                                    ✨ Gemini
+                                </button>
+                                <button class="ai-prov-btn" id="ai-prov-local" onclick="switchAIProvider('realesrgan_local')">
+                                    🖥 Real-ESRGAN
+                                    <span class="badge-free" style="background:linear-gradient(135deg,#16a34a,#15803d)">OFFLINE</span>
+                                </button>
+                            </div>
+
+                            <!-- HuggingFace Panel -->
+                            <div class="ai-prov-panel active" id="ai-panel-hf">
+                                <div class="ai-field">
+                                    <label>MODEL AI</label>
+                                    <select id="ai-hf-model"></select>
+                                </div>
+                                <div class="ai-field">
+                                    <label>HUGGINGFACE API TOKEN</label>
+                                    <div class="ai-key-wrap">
+                                        <input type="password" id="ai-hf-key" placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxx"
+                                               oninput="saveKey('huggingface', this.value)">
+                                        <button class="ai-key-btn" onclick="toggleKeyVisibility('ai-hf-key', this)" title="Show/hide">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                <circle cx="12" cy="12" r="3"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="ai-info">
+                                    Gratis — daftar di <a href="https://huggingface.co/join" target="_blank">huggingface.co</a>,
+                                    lalu buat token di <a href="https://huggingface.co/settings/tokens" target="_blank">Settings → Access Tokens</a>.
+                                    <strong>Model pertama kali bisa loading 20-60 detik</strong> (cold start normal).
+                                </div>
+                            </div>
+
+                            <!-- Replicate Panel -->
+                            <div class="ai-prov-panel" id="ai-panel-rep">
+                                <div class="ai-field">
+                                    <label>MODEL AI</label>
+                                    <select id="ai-rep-model"></select>
+                                </div>
+                                <div class="ai-field">
+                                    <label>REPLICATE API TOKEN</label>
+                                    <div class="ai-key-wrap">
+                                        <input type="password" id="ai-rep-key" placeholder="r8_xxxxxxxxxxxxxxxxxxxxxxxx"
+                                               oninput="saveKey('replicate', this.value)">
+                                        <button class="ai-key-btn" onclick="toggleKeyVisibility('ai-rep-key', this)" title="Show/hide">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                <circle cx="12" cy="12" r="3"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="ai-info">
+                                    Berbayar (~$0.001/gambar). Daftar di <a href="https://replicate.com" target="_blank">replicate.com</a>,
+                                    lalu ambil token di <a href="https://replicate.com/account/api-tokens" target="_blank">Account → API Tokens</a>.
+                                    <strong>Kualitas lebih tinggi & lebih cepat dari HuggingFace.</strong>
+                                </div>
+                            </div>
+
+                            <!-- Gemini Panel -->
+                            <div class="ai-prov-panel" id="ai-panel-gem">
+                                <div class="ai-field">
+                                    <label>MODEL GEMINI</label>
+                                    <select id="ai-gem-model"></select>
+                                </div>
+                                <div class="ai-field">
+                                    <label>GOOGLE AI STUDIO API KEY</label>
+                                    <div class="ai-key-wrap">
+                                        <input type="password" id="ai-gem-key" placeholder="AIzaSy..."
+                                               oninput="saveKey('gemini', this.value)">
+                                        <button class="ai-key-btn" onclick="toggleKeyVisibility('ai-gem-key', this)" title="Show/hide">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                <circle cx="12" cy="12" r="3"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="ai-info">
+                                    <strong>Gratis hingga batas tertentu.</strong>
+                                    Dapatkan API key di <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio → Get API Key</a>.
+                                    Gemini 2.0 Flash Image Generate akan <em>men-synthesize</em> detail gambar baru secara generatif.
+                                </div>
+                            </div>
+
+                            <!-- Local AI Offline Panel (Real-ESRGAN + Swin2SR) -->
+                            <div class="ai-prov-panel" id="ai-panel-local">
+                                <!-- Server status indicator -->
+                                <div id="esrgan-status" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(0,0,0,0.2);border-radius:10px;margin-bottom:12px;font-size:12.5px">
+                                    <span id="esrgan-dot" style="width:9px;height:9px;border-radius:50%;background:#6b7280;flex-shrink:0"></span>
+                                    <span id="esrgan-status-txt">Mengecek server...</span>
+                                    <button onclick="checkESRGANServer()" style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#9ca3af;cursor:pointer">Cek Ulang</button>
+                                </div>
+                                <div class="ai-field">
+                                    <label>MODEL AI OFFLINE</label>
+                                    <select id="ai-local-model"></select>
+                                </div>
+                                <div class="ai-info" style="background:rgba(22,163,74,0.08);border-color:rgba(22,163,74,0.25);color:#86efac">
+                                    <strong>📷 Real-ESRGAN</strong> — model weight sudah tersimpan lokal (siap).<br>
+                                    <strong>🌄 Swin2SR</strong> — Transformer SR; diunduh otomatis pertama kali (~50–100MB), lalu tersimpan offline.<br>
+                                    <br>Pastikan server aktif:<br>
+                                    <code style="display:block;margin-top:6px;padding:6px 10px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;color:#d1fae5">cd realesrgan-server &amp;&amp; ./start.sh</code>
+                                </div>
+                            </div>
+
+                            <!-- AI Strength Slider -->
+                            <div class="ai-strength-row">
+                                <label>AI STRENGTH</label>
+                                <input type="range" class="ai-range" id="ai-strength-s"
+                                       min="0" max="100" value="85"
+                                       oninput="onAIStrength(this.value)" style="--pct:85%">
+                                <span class="ai-strength-val" id="ai-strength-v">85%</span>
+                            </div>
+
+                            <!-- AI Progress (shown during API call) -->
+                            <div class="ai-prog-overlay" id="ai-prog-overlay">
+                                <div class="ai-prog-bar-wrap">
+                                    <div class="ai-prog-bar" id="ai-prog-bar"></div>
+                                </div>
+                                <div class="ai-prog-msg">
+                                    <span class="ai-prog-dot"></span>
+                                    <span id="ai-prog-msg">Menunggu...</span>
+                                </div>
+                            </div>
+
+                        </div><!-- .ai-body-inner -->
+                    </div><!-- .ai-body -->
+                </div><!-- .ai-section -->
+                <!-- ════════ END AI GENERATE ════════ -->
+
+                <!-- Action Buttons -->
+                <div class="br">
+                    <button class="btn bg2" onclick="resetImg()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="1 4 1 10 7 10"/>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                        </svg>
+                        Ganti Gambar
+                    </button>
+                    <button class="btn img-bp" id="img-proc-btn" onclick="processImg()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                        </svg>
+                        <span id="proc-btn-label">Proses Extreme</span>
+                    </button>
+                </div>
+            </div><!-- #img-editor -->
+
+            <!-- ─── Processing ─── -->
+            <div id="img-proc" style="display:none" class="ca">
+                <div class="pv">
+                    <div class="pa">
+                        <div class="pr"></div>
+                        <div class="pra"></div>
+                        <div class="pc">
+                            <div class="pp" id="img-pP">0%</div>
+                            <div class="ppl" id="img-ppl">Extreme</div>
+                        </div>
+                    </div>
+                    <div class="pbc">
+                        <div class="pbb">
+                            <div class="pbf img-pbf" id="img-pF" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <p class="pst" id="img-pS"><strong>Menyiapkan GPU...</strong></p>
+
+                    <!-- Live Log Panel -->
+                    <div class="log-head">
+                        <div class="log-head-dot" id="img-log-dot"></div>
+                        Log Proses
+                    </div>
+                    <div class="proc-log" id="img-log">
+                        <div class="log-row log-gpu"><span class="log-ts">--:--:--</span><span class="log-msg">Menunggu proses dimulai...</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Result ─── -->
+            <div id="img-result" style="display:none" class="ca">
+                <div class="cv">
+                    <div class="ci img-ci">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                    </div>
+                    <div class="ct">Upscale Selesai!</div>
+                    <div class="cs">Gambar ditingkatkan dengan Multi-Pass GPU Extreme Enhancement</div>
+
+                    <div class="img-result-wrap">
+                        <img id="img-result-preview" alt="Enhanced image preview">
+                    </div>
+
+                    <div class="rs">
+                        <div class="rst">
+                            <div class="rv ac" id="img-res-before">—</div>
+                            <div class="rl">Sebelum</div>
+                        </div>
+                        <div class="rst">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                                <polyline points="12 5 19 12 12 19"/>
+                            </svg>
+                        </div>
+                        <div class="rst">
+                            <div class="rv gn" id="img-res-after">—</div>
+                            <div class="rl">Sesudah</div>
+                        </div>
+                        <div class="rst">
+                            <div class="rv" id="img-res-size">—</div>
+                            <div class="rl">Ukuran File</div>
+                        </div>
+                        <div class="rst">
+                            <div class="rv" id="img-res-scale" style="font-size:14px">—</div>
+                            <div class="rl">Enhancement</div>
+                        </div>
+                    </div>
+
+                    <div class="eb">
+                        <button class="btn img-bp" onclick="dlImg()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download Gambar
+                        </button>
+                        <button class="btn bg2" onclick="backToEditor()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            Edit Ulang
+                        </button>
+                        <button class="btn bg2" onclick="resetImg()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"/>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                            </svg>
+                            Gambar Baru
+                        </button>
+                    </div>
+                </div>
+            </div><!-- #img-result -->
+
+        </div><!-- .mc -->
+    </div><!-- #img-panel -->
+
+</div><!-- .app -->
+
+<!-- Hidden processing elements for video -->
+<video id="hV" muted playsinline preload="auto" style="display:none"></video>
+<canvas id="pC" style="display:none"></canvas>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast"></div>
+
+<!-- Scripts (order matters: app.js first, then ai-engine.js, then image-app.js) -->
+<script src="assets/js/realesrgan-client.js?v=1784003845"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/ai-engine.js?v=1784003845"></script>
+<script src="assets/js/image-app.js?v=1784003845"></script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "video-upscale-pro",
+  "version": "1.0.0",
+  "description": "AI-powered video & image upscaler — WebGL + Real-ESRGAN + Swin2SR",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["upscale", "ai", "realesrgan", "webgl", "video"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "http-proxy-middleware": "^3.0.3",
+    "open": "^10.1.0"
+  }
+}
